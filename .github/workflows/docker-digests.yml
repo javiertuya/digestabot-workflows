@@ -63,7 +63,7 @@ jobs:
           username: ${{ secrets.DHI_USERNAME }}
           password: ${{ secrets.DHI_TOKEN }}
       - id: digestabot
-        uses: chainguard-dev/digestabot@v1.3.2
+        uses: chainguard-dev/digestabot@v1.3.3
         with:
           token: ${{ secrets.DIGESTABOT_TOKEN }}
           working-dir: ${{ inputs.working-dir }}
