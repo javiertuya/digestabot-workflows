@@ -58,6 +58,21 @@ jobs:
 | `stale-days` | `30` | Fail if an image was built more than this number of days ago |
 | `dhi-login` | `false` | Log in to `dhi.io` before running (needs the DHI secrets) |
 | `assignee` | (none) | User assigned and mentioned in the failure issue; if empty, the issue is not assigned |
+| `auto-merge` | `false` | Enable auto-merge on the PR, see below |
+| `merge-method` | `squash` | Merge method used by auto-merge: `merge`, `squash` or `rebase` |
+
+### Auto-merge
+
+With `auto-merge: true`, auto-merge is enabled on the PR once all images pass the checks, so the PR
+merges by itself when the required checks of the base branch succeed. It is enabled with
+`DIGESTABOT_TOKEN`, so the merge triggers the workflows that run on push to the base branch.
+
+- The repository setting *Allow auto-merge* (Settings > General) must be enabled; otherwise the
+  job fails and the failure issue is opened.
+- Auto-merge only waits for checks that are required by a branch protection rule or ruleset of
+  the base branch. If there are none, or they have already finished successfully, the PR is
+  merged at once.
+- The merge method must be allowed in the repository settings.
 
 ### Secrets
 
