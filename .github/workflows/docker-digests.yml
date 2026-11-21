@@ -31,6 +31,14 @@ on:
         description: GitHub user that is assigned and mentioned in the issue opened on failure (none if empty)
         type: string
         default: ''
+      auto-merge:
+        description: Enable auto-merge on the PR (requires the repository setting Allow auto-merge)
+        type: boolean
+        default: false
+      merge-method:
+        description: Merge method used by auto-merge (merge, squash or rebase)
+        type: string
+        default: squash
     secrets:
       DIGESTABOT_TOKEN:
         description: Personal access token (classic or fine-grained) used to push and to open the PR, so that other workflows are triggered
@@ -117,6 +125,30 @@ jobs:
             fi
           done < <(grep -rhoE --include="$INCLUDE_FILES" '[^[:space:]="]+@sha256:[a-f0-9]{64}' "$WORKING_DIR")
           exit $failed
+      # After the check, so that a PR with unresolvable or stale images is not merged.
+      # Uses the PAT, so that the merge into the base branch triggers other workflows
+      - id: auto-merge
+        name: Enable auto-merge
+        if: inputs.auto-merge && steps.digestabot.outputs.pull_request_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.DIGESTABOT_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.digestabot.outputs.pull_request_number }}
+          MERGE_METHOD: ${{ inputs.merge-method }}
+        run: |
+          fail() {
+            echo "::error::$1"
+            echo "- $1" >> "$RUNNER_TEMP/digestabot-errors.txt"
+            exit 1
+          }
+          case "$MERGE_METHOD" in
+            merge|squash|rebase) ;;
+            *) fail "Invalid merge-method '$MERGE_METHOD' (allowed: merge, squash, rebase)" ;;
+          esac
+          # If the PR is already mergeable (no required checks, or they have finished) gh merges it at once
+          out=$(gh pr merge "$PR_NUMBER" --repo "$REPO" --auto "--$MERGE_METHOD" 2>&1) \
+            || fail "Cannot enable auto-merge on PR #$PR_NUMBER: $out"
+          echo "$out"
       # Report the failure in an issue (or in a comment if there is already an open one)
       - name: Report failure in an issue
         if: failure()
@@ -133,6 +165,7 @@ jobs:
             Digestabot: ${{ steps.digestabot.outcome }}
             Setup crane: ${{ steps.setup-crane.outcome }}
             Check that all images can be resolved and are not stale: ${{ steps.check.outcome }}
+            Enable auto-merge: ${{ steps.auto-merge.outcome }}
         run: |
           steps=$(sed -n 's/^\(.*\): failure$/- Failed step: \1/p' <<< "$OUTCOMES")
           errors=$(cat "$RUNNER_TEMP/digestabot-errors.txt" 2>/dev/null || true)
